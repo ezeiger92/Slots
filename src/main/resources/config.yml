@@ -1,0 +1,15 @@
+# Slots config
+slot_tables:
+  basic:
+    cost: 20
+    potentials:
+      - display: EMERALD
+        weight: 3.0
+        reward: 200
+      - display: DIAMOND
+        weight: 2.0
+        reward: 300
+      - display: IRON_INGOT
+        weight: 4.0
+        reward: 100
+victory_delay_ticks: 15

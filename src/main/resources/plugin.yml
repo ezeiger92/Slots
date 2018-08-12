@@ -1,0 +1,20 @@
+name: Slots
+main: com.chromaclypse.slots.SlotsMain
+version: ${project.version}
+description: Armor stand slot machines
+author: ezeiger92
+api-version: 1.13
+depend: [ChromaLib, Vault]
+softdepend: []
+commands:
+  slots:
+    description: Root Slots command
+    usage: /<command> reload
+    permission: slots.create
+permissions:
+  slots.create:
+    description: Create, remove, reload
+    default: op
+  slots.use:
+    description: Use slot machine
+    default: true
