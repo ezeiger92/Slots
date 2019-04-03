@@ -6,10 +6,46 @@ slot_tables:
       - display: EMERALD
         weight: 3.0
         reward: 200
+        rewardMessage: Won 200
+        announceMessage: <player> won 200
+        announceRadius: 60
+        colors:
+          - ==: Color
+            RED: 65
+            BLUE: 132
+            GREEN: 243
+          - ==: Color
+            RED: 0
+            BLUE: 21
+            GREEN: 119
       - display: DIAMOND
         weight: 2.0
         reward: 300
+        rewardMessage: Won 300
+        announceMessage: <player> won 300
+        announceRadius: 60
+        colors:
+          - ==: Color
+            RED: 140
+            BLUE: 226
+            GREEN: 244
+          - ==: Color
+            RED: 32
+            BLUE: 129
+            GREEN: 149
       - display: IRON_INGOT
         weight: 4.0
         reward: 100
+        rewardMessage: Won 100
+        announceMessage: <player> won 100
+        announceRadius: 0
+        colors:
+          - ==: Color
+            RED: 216
+            BLUE: 216
+            GREEN: 216
+          - ==: Color
+            RED: 104
+            BLUE: 104
+            GREEN: 104
 victory_delay_ticks: 15

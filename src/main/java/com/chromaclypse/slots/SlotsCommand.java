@@ -6,20 +6,26 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.bukkit.util.RayTraceResult;
 
+import com.chromaclypse.api.Log;
 import com.chromaclypse.api.messages.Text;
 import com.chromaclypse.slots.MachineData.MachineInfo;
 import com.chromaclypse.slots.MachineData.MachineInfo.Stats;
+import com.chromaclypse.slots.SlotsConfig.SlotData;
+import com.chromaclypse.slots.SlotsConfig.SlotData.Potential;
 
 public class SlotsCommand implements TabExecutor {
-	private static final List<String> subcommands = Arrays.asList("create", "gstats", "info", "reload", "remove",
+	private static final List<String> subcommands = Arrays.asList("calculate", "create", "gstats", "info", "item", "reload", "remove",
 			"save");
 	private static final List<String> emptyList = Arrays.asList();
 
@@ -37,7 +43,7 @@ public class SlotsCommand implements TabExecutor {
 			d1 = 1 - d1;
 		}
 
-		long frac = (long) Math.round(d1 * 100);
+		long frac = (long) Math.round(d1 * 1000);
 
 		StringBuilder sb = new StringBuilder();
 		sb.append(whole);
@@ -70,17 +76,23 @@ public class SlotsCommand implements TabExecutor {
 	private void printStats(CommandSender sender, Stats stats) {
 		double balance = stats.revenue - stats.expenses;
 
-		sender.sendMessage(Text.colorize("  Balance: " + printDouble(balance) + " &a(+" + printDouble(stats.revenue)
+		sender.sendMessage(Text.format().colorize("  Balance: " + printDouble(balance) + " &a(+" + printDouble(stats.revenue)
 				+ ") &c[-" + printDouble(stats.expenses) + "]"));
 		sender.sendMessage("  Uses: " + stats.uses + ", Payouts: " + stats.payouts);
 
 		if (stats.payouts > 0) {
-			sender.sendMessage("  Average payout: " + printDouble(stats.expenses / stats.payouts));
+			sender.sendMessage("  Average payout size: " + printDouble(stats.expenses / stats.payouts));
 		}
 
 		if (stats.uses > 0) {
-			sender.sendMessage("  Average profit: " + printDouble(balance / stats.uses));
+			sender.sendMessage("  Payout percentage: " + printDouble(100 - balance / stats.revenue * 100) + "%");
+			sender.sendMessage("  Average profit: " + printDouble(balance / stats.uses) + " per roll");
 		}
+	}
+	
+	private void printLocation(CommandSender sender, Location location) {
+		sender.sendMessage("  Location: " + location.getWorld() + "["
+				+ location.getBlockX() + ", " + location.getBlockY() + ", " + location.getBlockZ() + "]");
 	}
 
 	@Override
@@ -93,7 +105,7 @@ public class SlotsCommand implements TabExecutor {
 				return subcommands.stream().filter(s -> s.startsWith(args[0])).collect(Collectors.toList());
 
 			default:
-				if ((args[0].equals("create") || args[0].equals("gstats")) && args.length == 2) {
+				if ((args[0].equals("create") || args[0].equals("gstats") || args[0].equals("calculate")) && args.length == 2) {
 					return handle.getConfig().slot_tables.keySet().stream().filter(s -> s.startsWith(args[1]))
 							.collect(Collectors.toList());
 				}
@@ -106,16 +118,55 @@ public class SlotsCommand implements TabExecutor {
 	public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
 		if (args.length > 0) {
 			switch (args[0].toLowerCase(Locale.ENGLISH)) {
+				case "calculate": {
+					if (args.length < 2) {
+						sender.sendMessage(Text.format().colorize("&c[Slots] Missing machine type! /slots calculate <type>"));
+						break;
+					}
+					
+					SlotData data = handle.dataOf(args[1]);
+					if (data == null) {
+						sender.sendMessage(Text.format().colorize("&c[Slots] Unknown machine type! Try tab completing"));
+						break;
+					}
+					
+					sender.sendMessage("Expected stats for: " + args[1]);
+					
+					double totalWeight = 0;
+					for(Potential p : data.potentials) {
+						totalWeight += p.weight;
+					}
+					
+					double rewardChance = 0;
+					double payout = 0;
+					
+					sender.sendMessage("  Cost per roll: " + printDouble(data.cost));
+					sender.sendMessage("  Potentials:");
+					
+					for(Potential p : data.potentials) {
+						double chance = Math.pow(p.weight / totalWeight, 3);
+						sender.sendMessage("    " + p.display + ": " + printDouble(chance * 100) + "%");
+						payout += chance * p.reward;
+						rewardChance += chance;
+					}
+					
+					sender.sendMessage("  Expected payout size: " + printDouble(payout / rewardChance));
+					sender.sendMessage("  Payout percentage: " + printDouble(payout / data.cost * 100) + "%");
+					sender.sendMessage("  Expected profit: " + printDouble(data.cost - payout) + " per roll");
+					
+					break;
+				}
+				
 				case "create":
 					if (sender instanceof Player) {
 
 						if (args.length < 2) {
-							sender.sendMessage(Text.colorize("&c[Slots] Missing machine type! /slots create <type>"));
+							sender.sendMessage(Text.format().colorize("&c[Slots] Missing machine type! /slots create <type>"));
 							break;
 						}
 
 						if (handle.dataOf(args[1]) == null) {
-							sender.sendMessage(Text.colorize("&c[Slots] Unknown machine type! Try tab completing"));
+							sender.sendMessage(Text.format().colorize("&c[Slots] Unknown machine type! Try tab completing"));
 							break;
 						}
 
@@ -140,8 +191,14 @@ public class SlotsCommand implements TabExecutor {
 						}
 
 						if (target.getType() != Material.AIR) {
-							handle.createMachine(args[1], target.getLocation(), lookingAt);
-							sender.sendMessage(Text.colorize("&a[Slots] Machine created"));
+							boolean created = handle.createMachine(args[1], target.getLocation(), lookingAt);
+							
+							if(created) {
+								sender.sendMessage(Text.format().colorize("&a[Slots] Machine created"));
+							}
+							else {
+								sender.sendMessage(Text.format().colorize("&c[Slots] Could not create machine"));
+							}
 						}
 					}
 					break;
@@ -154,7 +211,7 @@ public class SlotsCommand implements TabExecutor {
 					if (args.length > 1) {
 						arg = args[1];
 						if (handle.dataOf(args[1]) == null) {
-							sender.sendMessage(Text.colorize("&c[Slots] Unknown machine type! Try tab completing"));
+							sender.sendMessage(Text.format().colorize("&c[Slots] Unknown machine type! Try tab completing"));
 							break;
 						}
 
@@ -190,7 +247,7 @@ public class SlotsCommand implements TabExecutor {
 					double avgBalance = avgRevenue - avgExpenses;
 
 					sender.sendMessage("  Total machines: " + machines);
-					sender.sendMessage(Text.colorize("  Avg balance: " + printDouble(avgBalance) + " &a(+"
+					sender.sendMessage(Text.format().colorize("  Avg balance: " + printDouble(avgBalance) + " &a(+"
 							+ printDouble(avgRevenue) + ") &c[-" + printDouble(avgExpenses) + "]"));
 					sender.sendMessage(
 							"  Avg uses: " + printDouble(avgUses) + ", Avg payouts: " + printDouble(avgPayouts));
@@ -200,17 +257,20 @@ public class SlotsCommand implements TabExecutor {
 				case "info":
 					if (sender instanceof Player) {
 						Player player = (Player) sender;
-						Block target = player.getTargetBlock(null, 8);
+						RayTraceResult directionalBlock = player.rayTraceBlocks(8);
+						Block target = directionalBlock.getHitBlock();
 
 						if (target != null) {
-							MachineInfo machine = handle.getMachine(target.getLocation());
+							MachineInfo machine = handle.getMachine(target.getLocation(), directionalBlock.getHitBlockFace());
 
 							if (machine != null) {
-								sender.sendMessage("[Slots] Machine info: " + target.getLocation());
+								sender.sendMessage("[Slots] Machine info:");
+								printLocation(sender, target.getLocation());
+								sender.sendMessage("  Type: " + machine.type);
 								printStats(sender, machine.stats);
 							}
 							else {
-								sender.sendMessage(Text.colorize("&c[Slots] That is not a machine"));
+								sender.sendMessage(Text.format().colorize("&c[Slots] That is not a machine"));
 							}
 						}
 					}
@@ -218,28 +278,55 @@ public class SlotsCommand implements TabExecutor {
 
 				case "reload":
 					handle.getConfig().init(handle.getPlugin());
-					sender.sendMessage(Text.colorize("&a[Slots] Config reloaded"));
+					sender.sendMessage(Text.format().colorize("&a[Slots] Config reloaded"));
 					break;
 
 				case "remove":
 					if (sender instanceof Player) {
 						Player player = (Player) sender;
-						Block target = player.getTargetBlock(null, 8);
+						RayTraceResult directionalBlock = player.rayTraceBlocks(8);
+						Block target = directionalBlock.getHitBlock();
 
 						if (target != null) {
-							handle.removeMachine(target.getLocation());
-							sender.sendMessage(Text.colorize("&a[Slots] Machine removed"));
+							boolean removed = handle.removeMachine(target.getLocation(), directionalBlock.getHitBlockFace());
+							
+							if(removed) {
+								sender.sendMessage(Text.format().colorize("&a[Slots] Machine removed"));
+							}
+							else {
+								sender.sendMessage(Text.format().colorize("&c[Slots] Could not remove machine"));
+							}
 						}
 						else {
-							sender.sendMessage(Text.colorize("&c[Slots] That is not a machine"));
+							sender.sendMessage(Text.format().colorize("&c[Slots] That is not a machine"));
 						}
+					}
+					else {
+						sender.sendMessage(Text.format().colorize("&c[Slots] You must be a player for this"));
 					}
 					break;
 
 				case "save":
 					handle.save();
-					sender.sendMessage(Text.colorize("&a[Slots] Saved to disk"));
+					sender.sendMessage(Text.format().colorize("&a[Slots] Saved to disk"));
 					break;
+					
+				case "item":
+					if(sender instanceof Player) {
+						Player player = (Player)sender;
+						
+						Log.info("Serialized item for " + player.getName() + ":");
+						YamlConfiguration config = new YamlConfiguration();
+						config.set("rewardItem", player.getInventory().getItemInMainHand());
+
+						Log.info("\n" + config.saveToString());
+						player.sendMessage(Text.format().colorize("&a[Slots] serialized item to console"));
+					}
+					else {
+						sender.sendMessage(Text.format().colorize("&c[Slots] You must be a player for this"));
+					}
+					break;
+					
 				default:
 			}
 		}

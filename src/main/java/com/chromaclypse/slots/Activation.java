@@ -2,6 +2,8 @@ package com.chromaclypse.slots;
 
 import java.util.HashSet;
 
+import org.bukkit.block.data.BlockData;
+import org.bukkit.block.data.Directional;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -22,24 +24,29 @@ public class Activation implements Listener {
 	@EventHandler
 	public void onActivate(PlayerInteractEvent event) {
 		if (event.getAction() == Action.RIGHT_CLICK_BLOCK) {
-			MachineInfo machine = handle.getMachineFromInput(event.getClickedBlock().getLocation());
-
-			if (machine != null && !pause.contains(machine)) {
-				Result result = handle.getRoller().roll(event.getPlayer(), machine);
-
-				if (result != null) {
-					handle.getDisplay().udpate(machine, result);
-
-					if (result.isWinner()) {
-						pause.add(machine);
-
-						handle.getPlugin().getServer().getScheduler().runTaskLater(handle.getPlugin(), () -> {
-							pause.remove(machine);
-						}, handle.getConfig().victory_delay_ticks);
+			BlockData data = event.getClickedBlock().getBlockData();
+			
+			if(data instanceof Directional) {
+				MachineInfo machine = handle.getMachineFromInput(
+						event.getClickedBlock().getLocation(), ((Directional)data).getFacing());
+	
+				if (machine != null && !pause.contains(machine)) {
+					Result result = handle.getRoller().roll(event.getPlayer(), machine);
+	
+					if (result != null) {
+						handle.getDisplay().udpate(machine, result);
+	
+						if (result.isWinner()) {
+							pause.add(machine);
+	
+							handle.getPlugin().getServer().getScheduler().runTaskLater(handle.getPlugin(), () -> {
+								pause.remove(machine);
+							}, handle.getConfig().victory_delay_ticks);
+						}
 					}
+	
+					event.setCancelled(true);
 				}
-
-				event.setCancelled(true);
 			}
 		}
 	}

@@ -2,6 +2,7 @@ package com.chromaclypse.slots;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 
 import org.bukkit.Location;
 
@@ -17,6 +18,11 @@ public class MachineData extends ConfigObject {
 		public String facing = "NORTH";
 		public String type = null;
 		public Stats stats = new Stats();
+		private Random random = new Random();
+		
+		public Random getRandom() {
+			return random;
+		}
 
 		public static class Stats {
 			public int payouts = 0;

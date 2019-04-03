@@ -18,3 +18,6 @@ permissions:
   slots.use:
     description: Use slot machine
     default: true
+  slots.transient:
+    description: Run slots like a ghost! (no cost or rewards)
+    default: false

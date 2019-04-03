@@ -29,13 +29,17 @@ public class EconomicHandler {
 
 	public boolean activateMachine(MachineInfo machine, Player player) {
 		SlotData data = handle.dataOf(machine.type);
+		
+		if(player.hasPermission("slots.transient")) {
+			return true;
+		}
 
 		if (data == null) {
 			return false;
 		}
 
 		if (!economyCall(e -> e.getBalance(player) >= data.cost)) {
-			player.sendMessage(Text.colorize("&c[Slots] You need at least " + data.cost + "to activate this machine"));
+			player.sendMessage(Text.format().colorize("&c[Slots] You need " + data.cost + "r for this machine"));
 			return false;
 		}
 
@@ -52,6 +56,10 @@ public class EconomicHandler {
 
 	public boolean refund(MachineInfo machine, Player player) {
 		SlotData data = handle.dataOf(machine.type);
+		
+		if(player.hasPermission("slots.transient")) {
+			return true;
+		}
 
 		if (data == null) {
 			return false;
@@ -70,6 +78,10 @@ public class EconomicHandler {
 
 	public boolean payout(MachineInfo machine, Player player, Potential result) {
 		double value = result.reward;
+		
+		if(player.hasPermission("slots.transient")) {
+			return true;
+		}
 
 		if (!economyCall(e -> e.depositPlayer(player, "Slot machine payout", value).transactionSuccess())) {
 			return false;

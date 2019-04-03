@@ -38,9 +38,10 @@ public class Slots {
 
 			if (type != null) {
 				Location location = machine.location;
-
-				cache.put(location, UUID.fromString(m.getKey()));
-				storeControls(location, BlockFace.valueOf(machine.facing));
+				BlockFace facing = BlockFace.valueOf(machine.facing);
+				
+				cache.put(offsetByFace(location, facing), UUID.fromString(m.getKey()));
+				storeControls(location, facing);
 			}
 		}
 
@@ -48,9 +49,22 @@ public class Slots {
 		econ = new EconomicHandler(this);
 		display = new Display(this);
 	}
+	
+	private Location offsetByFace(Location location, BlockFace alongFace) {
+		return location.clone().add(alongFace.getModX() * 0.5, 0, alongFace.getModZ() * 0.5);
+	}
 
 	private boolean storeControls(Location location, BlockFace alongFace) {
+		return editControls(location, alongFace, true);
+	}
+	
+	private void removeControls(Location location, BlockFace alongFace) {
+		editControls(location, alongFace, false);
+	}
+	
+	private boolean editControls(Location location, BlockFace alongFace, boolean create) {
 		BlockFace f;
+		// Move forward 1 block so input (buttons) can sit on the neighboring block
 		Location l1 = location.clone().add(alongFace.getModX(), 0, alongFace.getModZ());
 		Location l2 = l1.clone();
 
@@ -73,12 +87,19 @@ public class Slots {
 				break;
 		}
 		
-		if(controlCache.containsKey(l1) || controlCache.containsKey(l2)) {
-			return false;
+		if(create) {
+			if(controlCache.containsKey(l1) || controlCache.containsKey(l2)) {
+				return false;
+			}
+			
+			controlCache.put(l1, location);
+			controlCache.put(l2, location);
 		}
-
-		controlCache.put(l1, location);
-		controlCache.put(l2, location);
+		else {
+			controlCache.remove(l1);
+			controlCache.remove(l2);
+		}
+		
 		return true;
 	}
 
@@ -94,7 +115,8 @@ public class Slots {
 	}
 
 	public boolean createMachine(String type, Location location, BlockFace alongFace) {
-		UUID tie = cache.get(location);
+		Location offset = offsetByFace(location, alongFace);
+		UUID tie = cache.get(offset);
 		SlotData d = config.slot_tables.get(type);
 
 		if (tie == null && d != null) {
@@ -108,7 +130,7 @@ public class Slots {
 				needsUpdate = true;
 				
 				data.machines.put(key.toString(), i);
-				cache.put(location, key);
+				cache.put(offset, key);
 
 				display.initalize(i);
 
@@ -119,11 +141,12 @@ public class Slots {
 		return false;
 	}
 
-	public MachineInfo getMachineFromInput(Location location) {
+	public MachineInfo getMachineFromInput(Location location, BlockFace alongFace) {
 		Location actualMachine = controlCache.get(location);
 
+		
 		if (actualMachine != null) {
-			MachineInfo result = getMachine(actualMachine);
+			MachineInfo result = getMachine(actualMachine, alongFace);
 
 			if (result != null) {
 				return result;
@@ -135,8 +158,8 @@ public class Slots {
 		return null;
 	}
 
-	public MachineInfo getMachine(Location location) {
-		UUID key = cache.get(location);
+	public MachineInfo getMachine(Location location, BlockFace alongFace) {
+		UUID key = cache.get(offsetByFace(location, alongFace));
 
 		if (key != null) {
 			return data.machines.get(key.toString());
@@ -149,13 +172,14 @@ public class Slots {
 		return config.slot_tables.get(type);
 	}
 
-	public boolean removeMachine(Location location) {
-		UUID key = cache.remove(location);
+	public boolean removeMachine(Location location, BlockFace alongFace) {
+		UUID key = cache.remove(offsetByFace(location, alongFace));
 
 		if (key != null) {
 			MachineInfo machine = data.machines.remove(key.toString());
 
 			if (machine != null) {
+				removeControls(location, alongFace);
 
 				needsUpdate = true;
 
