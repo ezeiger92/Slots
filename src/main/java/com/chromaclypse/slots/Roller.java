@@ -9,6 +9,7 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.meta.FireworkMeta;
+import org.bukkit.metadata.FixedMetadataValue;
 
 import com.chromaclypse.api.messages.Text;
 import com.chromaclypse.slots.MachineData.MachineInfo;
@@ -16,10 +17,13 @@ import com.chromaclypse.slots.SlotsConfig.SlotData;
 import com.chromaclypse.slots.SlotsConfig.SlotData.Potential;
 
 public class Roller {
-	private Slots handle;
+	private final Slots handle;
+	
+	private final FixedMetadataValue metadata;
 
 	public Roller(Slots handle) {
 		this.handle = handle;
+		metadata = new FixedMetadataValue(handle.getPlugin(), "dummy");
 	}
 
 	public Result roll(Player player, MachineInfo machine) {
@@ -122,7 +126,7 @@ public class Roller {
 			BlockFace facing = BlockFace.valueOf(machine.facing);
 			Location launch = machine.location.clone().add(0.5 + facing.getModX() * 0.8, 0.0, 0.5 + facing.getModZ() * 0.8);
 			
-			player.getWorld().spawn(launch, Firework.class, firework -> {
+			launch.getWorld().spawn(launch, Firework.class, firework -> {
 				FireworkMeta meta = firework.getFireworkMeta();
 				
 				meta.setPower(0);
@@ -132,6 +136,7 @@ public class Roller {
 					.build());
 				
 				firework.setFireworkMeta(meta);
+				firework.setMetadata("slots.rocket", metadata);
 			});
 		}
 

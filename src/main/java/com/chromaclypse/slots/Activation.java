@@ -4,9 +4,11 @@ import java.util.HashSet;
 
 import org.bukkit.block.data.BlockData;
 import org.bukkit.block.data.Directional;
+import org.bukkit.entity.Firework;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 import com.chromaclypse.slots.MachineData.MachineInfo;
@@ -48,6 +50,13 @@ public class Activation implements Listener {
 					event.setCancelled(true);
 				}
 			}
+		}
+	}
+	
+	@EventHandler(ignoreCancelled=true)
+	public void onDamage(EntityDamageByEntityEvent event) {
+		if (event.getDamager() instanceof Firework && event.getDamager().hasMetadata("slots.rocket")) {
+			event.setCancelled(true);
 		}
 	}
 }
